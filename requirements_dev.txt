@@ -1,0 +1,5 @@
+plotly==5.11.0
+numpy
+jax[cpu]
+jaxtyping
+jax_dataclasses
