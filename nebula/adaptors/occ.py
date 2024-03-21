@@ -1,4 +1,5 @@
 # %%
+from typing import Union, cast
 from OCP.TColgp import TColgp_HArray1OfPnt, TColgp_HArray2OfPnt
 from OCP.TColStd import TColStd_HArray1OfReal, TColStd_HArray1OfInteger
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
@@ -7,6 +8,7 @@ from OCP.gp import gp_Pnt
 from OCP.TopoDS import TopoDS
 import cadquery as cq
 from cadquery.cq import CQObject
+import jax
 from jupyter_cadquery import show
 import jax.numpy as jnp
 from nebula.evaluators.bspline import BsplineSurface
@@ -16,14 +18,21 @@ from jupyter_cadquery import show
 from OCP.BRepBuilderAPI import BRepBuilderAPI_NurbsConvert
 from OCP.BRep import BRep_Tool, BRep_Builder
 
-# import numpy as np
 
 
 class OCPAdapter:
     @staticmethod
-    def import_step(file_name: str) -> CQObject:
+    def import_step(file_name: str):
         workplane = cq.importers.importStep(file_name)
-        return workplane.val()
+        return cast(Union[cq.Compound, cq.Solid], workplane.val())
+
+    @staticmethod
+    def to_assembly(compound: Union[cq.Compound, cq.Solid]):
+        assembly = cq.Assembly()
+        faces = compound.Faces()
+        for i, face in enumerate(faces):
+            assembly.add(face, name=f"Face{i}")
+        return assembly
 
     @staticmethod
     def to_bspline_surface(face: cq.Face):
@@ -66,12 +75,17 @@ class OCPAdapter:
         )
 
 
-face_compounds = OCPAdapter.import_step(
+face_compound = OCPAdapter.import_step(
     "/Users/afshawnlotfi/Documents/nebulaNew/CNCRD.STEP"
 )
+# assembly = OCPAdapter.to_assembly(face_compound)
+# show(assembly)
+# %%
 filtered_faces: list[cq.Face] = []
-for i, face in enumerate(face_compounds.Faces()):
-    if i+1 in [388, 412, 389, 356]:
+for i, face in enumerate(face_compound.Faces()):
+    if i in [387, 411, 388, 355, 115, 95, 113, 114, 111, 112, 428, 427]:
+    # TODO: figure out why this produces faulty points
+    # if i in [106, 120]:
         filtered_faces.append(face)
     # face.exportBrep(f"face_{i}.brep")
 # for i in [388, 412, 389, 356]:
@@ -86,12 +100,16 @@ for i, face in enumerate(face_compounds.Faces()):
 
 surfs = [OCPAdapter.to_bspline_surface(face) for face in filtered_faces]
 
-# pnts = surf.ctrl_pnts
-# # plotly plot points
-# import plotly.graph_objects as go
-# fig = go.Figure(data=[go.Scatter3d(x=pnts[:, :, 0].flatten(), y=pnts[:, :, 1].flatten(), z=pnts[:, :, 2].flatten(), mode="markers")])
-# fig.update_layout(scene=dict(aspectmode='data'))
-# fig.show()
+pnts = jnp.empty((0, 3))
+for surf in surfs:
+    pnts = jnp.concatenate([pnts, surf.ctrl_pnts.reshape(-1,3)])
+    # plotly plot points
+
+import plotly.graph_objects as go
+fig = go.Figure(data=[go.Scatter3d(x=pnts[:, 0].flatten(), y=pnts[:, 1].flatten(), z=pnts[:, 2].flatten(), mode="markers")])
+fig.update_layout(scene=dict(aspectmode='data'))
+fig.show()
+
 
 
 # %%
