@@ -11,12 +11,13 @@ from cadquery.cq import CQObject
 import jax
 from jupyter_cadquery import show
 import jax.numpy as jnp
-from nebula.evaluators.bspline import BsplineSurface
+from nebula.evaluators.bspline import BsplineSurface, normalize_knot_vector
 from OCP.BRep import BRep_Builder
 from OCP.TopoDS import TopoDS_Shape
 from jupyter_cadquery import show
 from OCP.BRepBuilderAPI import BRepBuilderAPI_NurbsConvert
 from OCP.BRep import BRep_Tool, BRep_Builder
+from OCP.GeomConvert import GeomConvert
 
 
 
@@ -40,7 +41,11 @@ class OCPAdapter:
         nurbs_converter = BRepBuilderAPI_NurbsConvert(face.wrapped)
         nurbs_converter.Perform(face.wrapped)
         nurbs_shape = TopoDS.Face_s(nurbs_converter.Shape())
-        geom_bspline_surface = BRep_Tool.Surface_s(nurbs_shape)
+        brep_surface = BRep_Tool.Surface_s(nurbs_shape)
+        geom_bspline_surface = GeomConvert.SurfaceToBSplineSurface_s(brep_surface)
+
+        geom_bspline_surface.SetUNotPeriodic()
+        geom_bspline_surface.SetVNotPeriodic()
 
         poles = geom_bspline_surface.Poles()
         v_knots = geom_bspline_surface.VKnots()
@@ -68,24 +73,22 @@ class OCPAdapter:
 
         return BsplineSurface(
             ctrl_pnts=jnp.array(poles_arr),
-            u_knots=jnp.array(u_knots_arr),
-            v_knots=jnp.array(v_knots_arr),
+            u_knots=normalize_knot_vector(u_knots_arr),
+            v_knots=normalize_knot_vector(v_knots_arr),
             u_degree=geom_bspline_surface.UDegree(),
             v_degree=geom_bspline_surface.VDegree(),
         )
 
 
 face_compound = OCPAdapter.import_step(
-    "/Users/afshawnlotfi/Documents/nebulaNew/CNCRD.STEP"
+    "/workspaces/nebulaNew/CNCRD.STEP"
 )
 # assembly = OCPAdapter.to_assembly(face_compound)
 # show(assembly)
 # %%
 filtered_faces: list[cq.Face] = []
 for i, face in enumerate(face_compound.Faces()):
-    if i in [387, 411, 388, 355, 115, 95, 113, 114, 111, 112, 428, 427]:
-    # TODO: figure out why this produces faulty points
-    # if i in [106, 120]:
+    if i in [387, 411, 388, 355, 115, 95, 113, 114, 111, 112, 428, 427, 106, 120]:
         filtered_faces.append(face)
     # face.exportBrep(f"face_{i}.brep")
 # for i in [388, 412, 389, 356]:
@@ -111,6 +114,47 @@ fig.update_layout(scene=dict(aspectmode='data'))
 fig.show()
 
 
+# %%
+from geomdl import BSpline
+from geomdl.visualization import VisPlotly
+
+def display_bspline_surf(bspline_data: BsplineSurface):
+    # Create a BSpline surface instance
+    surf = BSpline.Surface()
+
+    # Set degrees
+    surf.degree_u = bspline_data.u_degree
+    surf.degree_v = bspline_data.v_degree
+
+    # Get the control points from the generated grid
+    surf.ctrlpts2d = bspline_data.ctrl_pnts.tolist()
+
+    # Set knot vectors
+    surf.knotvector_u = bspline_data.u_knots.tolist()
+    surf.knotvector_v = bspline_data.v_knots.tolist()
+
+
+    # Set sample size
+    surf.sample_size = 100
+
+
+    # Set visualization component
+    surf.evaluate
+    surf.vis = VisPlotly.VisSurface(legend=False)
+
+    # print(surf.sample_size_u)
+    # print(surf.sample_size_v)
+    # print(surf.evalpts)
+    # print(len(surf.evalpts), len(surf.evalpts[0]))
+
+    # Plot the surface
+    surf.render()
+
+display_bspline_surf(surfs[-2])
+
+# %%
+from nebula.evaluators.bspline import BSplineEvaluator
+res = BSplineEvaluator.eval_surface(surfs[-2], jnp.linspace(0,1,100), jnp.linspace(0,1,100))
 
 # %%
 from nebula.render.tesselation import Tesselator

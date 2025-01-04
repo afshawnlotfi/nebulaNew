@@ -1,7 +1,7 @@
 
 import jax
 import jax.numpy as jnp
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence, Union
 import jax_dataclasses as jdc
 from jaxtyping import Array, Float
 
@@ -14,6 +14,14 @@ def get_sampling(start: float, end: float, num_points: int, is_cosine_sampling: 
         beta = jnp.linspace(0.0,jnp.pi, num_points, endpoint=True)
         return 0.5*(1.0-jnp.cos(beta))
     return jnp.linspace(start, end, num_points, endpoint=True)
+
+def normalize_knot_vector(knot_vector: Union[jax.Array, Sequence[float]], decimals: int = 18):
+    knot_vector = jnp.array(knot_vector)
+    first_knot = knot_vector[0]
+    last_knot = knot_vector[-1]
+    denominator = last_knot - first_knot
+    
+    return jnp.round((knot_vector - first_knot) / denominator, decimals=decimals)
 
 @jdc.pytree_dataclass
 class BsplineSurface:
@@ -30,6 +38,29 @@ class BsplineCurve:
     degree: int
     knots: Optional[jax.Array] = None
     
+
+# def find_span_linear(degree: int, knot_vector: jnp.ndarray, num_ctrlpts: int, knot: float):
+#     """ Finds the span of a single knot over the knot vector using linear search.
+
+#     Alternative implementation for the Algorithm A2.1 from The NURBS Book by Piegl & Tiller.
+
+#     :param degree: degree, :math:`p`
+#     :type degree: int
+#     :param knot_vector: knot vector, :math:`U`
+#     :type knot_vector: list, tuple
+#     :param num_ctrlpts: number of control points, :math:`n + 1`
+#     :type num_ctrlpts: int
+#     :param knot: knot or parameter, :math:`u`
+#     :type knot: float
+#     :return: knot span
+#     :rtype: int
+#     """
+#     span = degree + 1  # Knot span index starts from zero
+#     while span < num_ctrlpts and knot_vector[span] <= knot:
+#         span += 1
+
+#     return span - 1
+
 
 class BSplineEvaluator:
     @staticmethod
@@ -60,6 +91,12 @@ class BSplineEvaluator:
         )
         span = jnp.clip(span_start + span_offset, a_max=num_ctrlpts)
         return span - 1
+        # spans = jnp.zeros_like(knot_samples, dtype=jnp.int32)
+        # for i, knot in enumerate(knot_samples):
+        #     span = find_span_linear(degree, knot_vector, num_ctrlpts, knot)
+
+        #     spans = spans.at[i].set(span)
+        # return spans
 
     @staticmethod
     def basis_functions(

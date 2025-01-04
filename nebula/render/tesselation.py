@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 import jax.numpy as jnp
 from nebula.evaluators.bspline import BSplineEvaluator, BsplineSurface, get_sampling
-
+from tqdm import tqdm
 
 @dataclass
 class Mesh:
@@ -91,7 +91,7 @@ class Tesselator:
     @staticmethod
     def tesselate(surfs: list[BsplineSurface]):
         meshes: list[Mesh] = []
-        for surf in surfs:
+        for surf in tqdm(surfs):
             mesh = Tesselator.tesselate_surface(surf)
             meshes.append(mesh)
         return Mesh.combine(meshes)

@@ -3,3 +3,4 @@ numpy
 jax[cpu]
 jaxtyping
 jax_dataclasses
+jupyter-cadquery @ git+https://github.com/OpenOrion/jupyter-cadquery.git
